@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 from pymongo import MongoClient
+from litellm import completion
+
 
 def main():
     st.set_page_config(
@@ -131,7 +133,7 @@ def main():
             st.metric("Read", f"{stats['percentage_read']:.1f}%")
 
     # Main content
-    st.markdown("<h1 class='main-header'>📚 BookShelf - Library Manager</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-header'>📚 PIONEERS - Library </h1>", unsafe_allow_html=True)
 
     # Create tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Add Book", "🗑️ Remove Book", "🔍 Search", "📖 All Books", "📊 Statistics"])
@@ -244,6 +246,9 @@ def main():
                         st.markdown("</div>", unsafe_allow_html=True)
                     else:
                         st.info("No matching books found. Try a different search term.")
+                        
+        st.write("hello world")         
+               
 
     # Tab 4: Display all books
     with tab4:
