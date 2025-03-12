@@ -6,7 +6,7 @@ from pymongo import MongoClient
 
 def main():
     st.set_page_config(
-    page_title="BookShelf - Personal Library Manager",
+    page_title="PIONEERS - Library ",
     page_icon="📚",
     layout="wide",
     initial_sidebar_state="expanded"
