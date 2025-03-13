@@ -12,5 +12,6 @@ dependencies = [
     "plotly>=6.0.0",
     "plotly-express>=0.4.1",
     "pymongo>=4.11.2",
+    "python-dotenv>=1.0.1",
     "streamlit>=1.43.2",
 ]

@@ -5,8 +5,13 @@ from datetime import datetime
 from pymongo import MongoClient
 from litellm import completion
 import os
+from dotenv import load_dotenv
 import requests
 
+
+load_dotenv()
+
+DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING")
 
 # function to search directly from browser using google's programmable custom search engine.
 def search_google(query: str) -> str:
@@ -52,7 +57,7 @@ gemini_api_key = st.secrets["GEMINI_API_KEY"]
 
 os.environ["GEMINI_API_KEY"] = gemini_api_key
 
-
+connection_string = st.secrets["mongodb"]["connection_string"]
 
 def main():
     st.set_page_config(
@@ -102,7 +107,7 @@ def main():
     # MongoDB Connection
     @st.cache_resource
     def init_connection():
-        return MongoClient("mongodb+srv://Habib:yuckfu123@baitulhikma.5aovr.mongodb.net/")
+        return MongoClient("mongodb+srv://habib:yucfudbyuckfu@cluster0.5aovr.mongodb.net/")
 
     client = init_connection()
     db = client["hikmamanager"]

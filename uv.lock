@@ -686,6 +686,7 @@ dependencies = [
     { name = "plotly" },
     { name = "plotly-express" },
     { name = "pymongo" },
+    { name = "python-dotenv" },
     { name = "streamlit" },
 ]
 
@@ -698,6 +699,7 @@ requires-dist = [
     { name = "plotly", specifier = ">=6.0.0" },
     { name = "plotly-express", specifier = ">=0.4.1" },
     { name = "pymongo", specifier = ">=4.11.2" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "streamlit", specifier = ">=1.43.2" },
 ]
 
