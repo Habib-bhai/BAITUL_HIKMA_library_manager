@@ -57,7 +57,6 @@ gemini_api_key = st.secrets["GEMINI_API_KEY"]
 
 os.environ["GEMINI_API_KEY"] = gemini_api_key
 
-connection_string = st.secrets["mongodb"]["connection_string"]
 
 def main():
     st.set_page_config(
