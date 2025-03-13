@@ -4,6 +4,54 @@ import plotly.express as px
 from datetime import datetime
 from pymongo import MongoClient
 from litellm import completion
+import os
+import requests
+
+
+# function to search directly from browser using google's programmable custom search engine.
+def search_google(query: str) -> str:
+    """Fetches top search results from Google Custom Search API."""
+    GOOGLE_API_KEY = st.secrets["UNRESTRICTED_KEY"]
+    CX_ID = st.secrets["CX_ID"]
+    
+    url = f"https://www.googleapis.com/customsearch/v1?q={query}&key={GOOGLE_API_KEY}&cx={CX_ID}"
+    response = requests.get(url).json()
+    results = response.get("items", [])
+    if not results:
+        return "No relevant search results found."
+
+    # Format top results
+    
+    # Format top results
+    search_summary = "\n".join([f"- {item['link']}" for item in results[:3]])
+    
+    return f"Here are the latest search results:\n{search_summary}"
+
+
+# searching tool for gemini api, to equip it with searching capabilities (not using right now will use it later on)
+# tools = [
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "search_google",
+#             "description": "Fetches live search results from Google Search API",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "query": {"type": "string", "description": "Search query string"}
+#                 },
+#                 "required": ["query"]
+#             }
+#         }
+#     }
+# ]
+
+ 
+
+gemini_api_key = st.secrets["GEMINI_API_KEY"]
+
+os.environ["GEMINI_API_KEY"] = gemini_api_key
+
 
 
 def main():
@@ -119,7 +167,7 @@ def main():
 
     # Sidebar
     with st.sidebar:
-        st.image("https://place-hold.it/300x100?text=BookShelf&fontsize=23", width=250)
+        st.image("https://place-hold.it/300x100?text=PIONEERS&fontsize=23", width=250)
         st.markdown("### Your Personal Library Manager")
         st.markdown("---")
 
@@ -136,7 +184,7 @@ def main():
     st.markdown("<h1 class='main-header'>📚 PIONEERS - Library </h1>", unsafe_allow_html=True)
 
     # Create tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Add Book", "🗑️ Remove Book", "🔍 Search", "📖 All Books", "📊 Statistics"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📝 Add Book", "🗑️ Remove Book", "🔍 Search", "📖 All Books", "📊 Statistics", "👨🏻‍💻 Ai Help in Finding Book"])
 
     # Tab 1: Add a book
     with tab1:
@@ -216,6 +264,9 @@ def main():
     with tab3:
         st.markdown("<h2 class='sub-header'>Search Your Library</h2>", unsafe_allow_html=True)
 
+        # state variable to control the dispaly and view state of summary btn
+        st.session_state.viewbtn = False
+        
         books = get_all_books()
         if not books:
             st.warning("Your library is empty. Add some books first!")
@@ -231,23 +282,52 @@ def main():
                 if search_term:
                     # Use your existing search function
                     search_results = search_book(search_term)
-
+                    if search_results not in st.session_state:
+                        st.session_state.search_results = search_results
                     if search_results:
                         st.markdown("<div class='card'>", unsafe_allow_html=True)
                         st.markdown(f"### Found {len(search_results)} results")
 
                         # Convert to DataFrame for better display
                         df = pd.DataFrame(search_results)
+                        
                         # Remove MongoDB _id column for display
                         if '_id' in df.columns:
                             df = df.drop('_id', axis=1)
 
                         st.dataframe(df, use_container_width=True)
                         st.markdown("</div>", unsafe_allow_html=True)
+                        st.session_state.viewbtn = True
+                        
                     else:
                         st.info("No matching books found. Try a different search term.")
-                        
-        st.write("hello world")         
+        
+        
+        
+        if st.session_state.viewbtn:        
+            st.markdown("<div class='card'>", unsafe_allow_html=True)                
+            st.subheader("Get a Quick Summary of the Book and purchase link")
+            st.button("Get Summary", key="summary_btn")
+            if st.session_state.summary_btn:  
+                response = completion(
+                    model="gemini/gemini-2.0-flash", 
+                    messages=[ 
+                          {
+                              "role": "system",
+                              "content": "You are an expert digital library manager AI Agent now and now you are integrated in a library manager's search feature, so, the user will prompt you to give Quick 2 paragraph and well written with heading and bullet points summary of books. So, when you start responding don't say anything like 'I understand! I am now acting as an AI Agent integrated into a library manager's search feature.' just start with the task."
+                           },
+                          {"role": "user", "content": f" Give a quick summary of book {st.session_state.search_results[0]['title']}, it's author is {st.session_state.search_results[0]['author']}"}
+                          ],
+
+
+                     )      
+
+                st.write(response["choices"][0].message.content)
+                
+                google_search_result =  search_google(query=f"{st.session_state.search_results[0]['title']} by {st.session_state.search_results[0]['author']} buy links OR purchase OR order site:amazon.com OR site:ebay.com OR site:walmart.com OR site:booksamillion.com OR site:bookdepository.com OR site:target.com")
+                
+                st.subheader("PURCHASE LINKS")
+                st.write(google_search_result)
                
 
     # Tab 4: Display all books
@@ -348,6 +428,202 @@ def main():
                 st.metric("Read Percentage", f"{stats['percentage_read']:.1f}%")
             st.markdown("</div>", unsafe_allow_html=True)
 
+    # Tab 6: AI Recommendations
+   # Tab 6: AI Recommendations
+    with tab6:
+        st.markdown("<h2 class='sub-header'>🤖 AI Book Recommendations</h2>", unsafe_allow_html=True)
 
+        st.markdown("""
+        <div class="ai-card">
+            <h3 class="ai-header">Let AI Find Your Next Great Read</h3>
+            <p>Tell us about your preferences, and our AI will suggest books tailored just for you.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Create two columns for the form layout
+        col1, col2 = st.columns([3, 2])
+
+        if 'validation_error' not in st.session_state:
+            st.session_state.validation_error = False
+            st.session_state.error_message = ""
+        
+        with col1:
+            with st.form("ai_recommendation_form"):
+                st.markdown("<div class='preference-section'>", unsafe_allow_html=True)
+                st.markdown("### What are you looking for?")
+                
+                if st.session_state.validation_error:
+                    st.error(st.session_state.error_message)
+
+                # Primary preferences
+                genre_preference = st.multiselect(
+                    "Preferred Genres",
+                    options=["Fiction", "Non-Fiction", "Science Fiction", "Fantasy", "Mystery", 
+                             "Thriller","Biography", "History", "Philosophy",
+                             "Science", "Self-Help", "Poetry", "Classics",
+                             "Horror", "Adventure", "Humor", "Drama", "Dystopian"],
+                    
+                )
+
+                mood = st.select_slider(
+                    "What mood are you in?",
+                    options=["Lighthearted", "Thoughtful", "Educational", "Thrilling", "Emotional", "Dark", "Inspirational"]
+                )
+
+                length_preference = st.radio(
+                    "Book Length",
+                    options=["Short (under 300 pages)", "Medium (300-500 pages)", "Long (500+ pages)", "Any length"]
+                )
+
+                st.markdown("</div>", unsafe_allow_html=True)
+
+                # Advanced preferences
+                st.markdown("<div class='preference-section'>", unsafe_allow_html=True)
+                st.markdown("### Tell us more (optional)")
+
+                time_period = st.multiselect(
+                    "Preferred Time Periods",
+                    options=["Contemporary", "20th Century", "19th Century", "Renaissance", 
+                             "Medieval", "Ancient", "Future", "Any era"]
+                )
+
+                writing_style = st.select_slider(
+                    "Writing Style",
+                    options=["Simple", "Moderate", "Complex", "Poetic", "Direct", "Descriptive"]
+                )
+
+                themes = st.multiselect(
+                    "Themes You Enjoy",
+                    options=["Family", "Adventure", "Coming of Age", "Redemption", 
+                             "Justice", "Power", "Identity", "Survival", "Friendship",
+                             "War", "Politics", "Technology", "Nature", "Spirituality"]
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
+
+                # Personal context
+                st.markdown("<div class='preference-section'>", unsafe_allow_html=True)
+                st.markdown("### Personal Context")
+
+                recently_read = st.text_area("Books you've recently enjoyed", height=100,
+                                             placeholder="Enter titles or authors you've liked recently...")
+
+                avoid = st.text_area("What would you like to avoid?", height=100,
+                                     placeholder="Any themes, topics, or styles you don't enjoy...")
+
+                reading_purpose = st.selectbox(
+                    "Purpose for Reading",
+                    options=["Entertainment", "Learning something new", "Personal growth", 
+                             "Escapism", "Academic", "Professional development"]
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
+
+                # Free text field for specific requests
+                specific_request = st.text_area(
+                    "Any specific requests for the AI?",
+                    height=100,
+                    placeholder="E.g., 'Looking for a book similar to Dune but with strong female characters'"
+                )
+
+                submitted = st.form_submit_button("Get AI Recommendations")
+                
+                if submitted:
+                # Check if all required fields are filled
+                    validation_errors = []
+
+                    if not genre_preference:
+                        validation_errors.append("Please select at least one genre")
+
+                    if not time_period:
+                        validation_errors.append("Please select at least one time period")
+
+                    if not themes:
+                        validation_errors.append("Please select at least one theme")
+
+                    if not recently_read.strip():
+                        validation_errors.append("Please enter books you've recently enjoyed")
+
+                    
+                    # Update session state based on validation results
+                    if validation_errors:
+                        st.session_state.validation_error = True
+                        st.session_state.error_message = "Please fill in all required fields:\n• " + "\n• ".join(validation_errors)
+                        st.rerun()  # Force a rerun to show the error message
+                else:
+                    st.session_state.validation_error = False
+                    st.session_state.error_message = ""
+
+        with col2:
+            st.markdown("<div class='ai-card'>", unsafe_allow_html=True)
+            st.markdown("### How It Works")
+            st.markdown("""
+            1. **Fill out your preferences** - The more detail you provide, the better the recommendations
+            2. **Submit your request** - Our AI analyzes your preferences
+            3. **Review suggestions** - Get personalized book recommendations
+            """)
+            st.markdown("<hr>", unsafe_allow_html=True)
+            st.markdown("### Tips for Great Recommendations")
+            st.markdown("""
+            - Be specific about books you've enjoyed
+            - Include authors whose style you appreciate
+            - Mention themes that resonate with you
+            - Let us know your reading goals
+            """)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            # Display a placeholder for where recommendations will appear
+            st.markdown("<div class='ai-card'>", unsafe_allow_html=True)
+            
+            recommendation_data = {
+                        "genres": genre_preference,
+                        "mood": mood,
+                        "length": length_preference,
+                        "time_period": time_period,
+                        "writing_style": writing_style,
+                        "themes": themes,
+                        "recently_read": recently_read,
+                        "avoid": avoid,
+                        "purpose": reading_purpose,
+                        "specific_request": specific_request
+                    }
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # Add a new section for AI response that spans the full width below both columns
+        st.markdown("<div class='ai-response-section'>", unsafe_allow_html=True)
+        st.markdown("## Your Personalized Book Recommendations", unsafe_allow_html=True)
+
+        # Only display content if the form has been submitted
+        if 'submitted' in locals() and submitted:
+            # Create tabs for different types of recommendations
+            rec_tabs = st.tabs(["Top Picks"])
+
+            with rec_tabs[0]:
+                st.markdown("<div class='recommendation-card'>", unsafe_allow_html=True)
+
+                # This is where you'll integrate your actual AI response
+                if submitted:
+                    response_second = completion(
+                        model="gemini/gemini-2.0-flash", 
+                        messages=[ 
+                              {
+                                  "role": "system",
+                                  "content": "You are a library recommendation engine AI agent now, so, the user will be giving you his perferences i.e. Genres, mood, Time periods, Writing style, Theme, mood, book length, and personal context, based on that you have to suggest him/her books to read and you have to give just specific information like book title, Author Name, ratings, and very short description and read the whole arrays if any information is give in form of array. So, when you start responding don't say anything like 'I understand! I am now acting as an AI Agent integrated into a library manager's search feature.' just start with the task."
+                               },
+                              {
+                                  "role": "user", "content": f"Give me some books on {recommendation_data['genres']} , my mood is {recommendation_data["mood"]} and I want the length of book to be {recommendation_data["length"]}. The recommended books should blong to {recommendation_data["time_period"][0]} time period and their writing style should be {recommendation_data['writing_style']}. The themes of the books should be {recommendation_data['themes']} . I have recently read {recommendation_data['recently_read']} and I want to avoid {recommendation_data['avoid']}. I want to read books for {recommendation_data['purpose']}. {recommendation_data['specific_request']}"
+                                  }
+                              ],
+                         )
+                
+                    st.write(response_second["choices"][0].message.content)
+                
+               
+                st.markdown("</div>", unsafe_allow_html=True)
+
+           
+        else:
+            st.info("Submit the form above to see your personalized book recommendations.")
+
+        st.markdown("</div>", unsafe_allow_html=True)
 if __name__ == "__main__":
     main()
